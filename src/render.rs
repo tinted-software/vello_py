@@ -1,14 +1,13 @@
 use std::sync::{Arc, Mutex};
 
 use image::{ImageBuffer, Rgba};
-use pyo3::{Py, PyRef, Python, pyclass, pymethods};
+use pyo3::{Py, Python, pyclass, pymethods};
 use vello::{
     AaConfig, Renderer, RendererOptions,
-    peniko::color::{AlphaColor, palette},
+    peniko::color::AlphaColor,
     wgpu::{
-        self, Adapter, Backends, BufferAddress, BufferDescriptor, BufferUsages,
-        CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d, Instance, InstanceDescriptor,
-        MapMode, Origin3d, PollType, Queue, RequestAdapterOptions, TexelCopyBufferInfo,
+        self, Backends, CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d, Instance,
+        InstanceDescriptor, Origin3d, PollType, Queue, RequestAdapterOptions, TexelCopyBufferInfo,
         TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureDescriptor,
         TextureDimension, TextureFormat, TextureUsages, TextureViewDescriptor,
     },
@@ -19,8 +18,6 @@ use crate::scene::PyScene;
 #[pyclass(name = "Renderer")]
 pub struct PyRenderer {
     scene: Py<PyScene>,
-    instance: Instance,
-    adapter: Adapter,
     device: Device,
     queue: Queue,
     renderer: Arc<Mutex<Renderer>>,
@@ -47,8 +44,6 @@ impl PyRenderer {
         ));
 
         PyRenderer {
-            instance,
-            adapter,
             device,
             queue,
             renderer,
@@ -161,7 +156,6 @@ impl PyRenderer {
         drop(view);
         output_staging_buffer.unmap();
 
-        println!("Saving rendered image to {}", output_path);
         buffer.save(output_path).expect("Failed to save PNG image");
     }
 }

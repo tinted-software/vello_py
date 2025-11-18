@@ -1,0 +1,19 @@
+[project]
+name = "vello_py"
+version = "0.1.0"
+description = "Python bindings for Vello"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE.txt" }
+keywords = ["python", "rust", "pyo3", "vello"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+]
+
+[build-system]
+requires = ["maturin>=1.0"]
+build-backend = "maturin"

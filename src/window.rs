@@ -38,7 +38,6 @@ impl ApplicationHandler for PyWindow {
 
 #[pyfunction]
 pub fn run_winit(callback: Py<PyAny>) {
-    // Leak the handler so it becomes `'static`
     let handler = Box::leak(Box::new(PyWindow {
         py_callback: callback,
         window: None,
