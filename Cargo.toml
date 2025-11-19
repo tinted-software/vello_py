@@ -9,11 +9,15 @@ crate-type = ["cdylib"]
 
 [dependencies]
 flume = "0.11.1"
-image = "0.25.9"
 pollster = "0.4.0"
 pyo3 = { version = "0.27.1", features = ["extension-module", "experimental-async"] }
-vello = { git = "https://github.com/linebender/vello" }
+vello_common = { git = "https://github.com/linebender/vello" }
+vello_hybrid = { git = "https://github.com/linebender/vello" }
+wgpu = { version = "27.0.1", default-features = false, features = ["wgsl", "std"] }
 winit = { version = "0.30.12", default-features = false, features = ["rwh_06", "x11"] }
+
+[dev-dependencies]
+wgpu = { version = "27.0.1", default-features = false, features = ["wgsl", "std", "vulkan", "vulkan-portability"] }
 
 [features]
 # default = ["window"]

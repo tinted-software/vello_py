@@ -1,17 +1,11 @@
 use std::sync::{Arc, Mutex};
 
-use image::{ImageBuffer, Rgba};
-use pyo3::{Py, PyResult, Python, exceptions::PyValueError, pyclass, pymethods};
-use vello::{
-    AaConfig, Renderer, RendererOptions,
-    peniko::color::AlphaColor,
-    wgpu::{
-        self, Backends, CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d, Instance,
-        InstanceDescriptor, Origin3d, PollType, Queue, RequestAdapterOptions, TexelCopyBufferInfo,
-        TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureDescriptor,
-        TextureDimension, TextureFormat, TextureUsages, TextureViewDescriptor,
-        util::TextureBlitter,
-    },
+use pyo3::{Py, PyResult, Python, pyclass};
+use vello_hybrid::{RenderSize, RenderTargetConfig, Renderer, Scene};
+use wgpu::{
+    Adapter, Backends, CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d, Instance,
+    InstanceDescriptor, Queue, RequestAdapterOptions, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureUsages, TextureViewDescriptor, util::TextureBlitter,
 };
 
 use crate::{app::PyWindowHandle, scene::PyScene};
@@ -19,61 +13,61 @@ use crate::{app::PyWindowHandle, scene::PyScene};
 #[pyclass(name = "Renderer")]
 pub struct PyRenderer {
     instance: Instance,
-    adapter: wgpu::Adapter,
+    adapter: Adapter,
     device: Device,
     queue: Queue,
-    pub surface: Option<wgpu::Surface<'static>>,
-    pub scene: Py<PyScene>,
+    surface: wgpu::Surface<'static>,
+    scene: Py<PyScene>,
     renderer: Arc<Mutex<Renderer>>,
-    window: Option<Py<PyWindowHandle>>,
+    window_handle: Py<PyWindowHandle>,
 }
 
 impl PyRenderer {
     pub(crate) fn resize(&self, width: u32, height: u32) {
-        if let Some(surface) = &self.surface {
-            surface.configure(
-                &self.device,
-                &wgpu::SurfaceConfiguration {
-                    usage: TextureUsages::RENDER_ATTACHMENT,
-                    format: surface
-                        .get_capabilities(&self.adapter)
-                        .formats
-                        .first()
-                        .cloned()
-                        .unwrap_or(TextureFormat::Bgra8UnormSrgb),
-                    width,
-                    height,
-                    present_mode: wgpu::PresentMode::Fifo,
-                    alpha_mode: wgpu::CompositeAlphaMode::Auto,
-                    view_formats: vec![],
-                    desired_maximum_frame_latency: 2,
-                },
-            );
-        }
+        *self
+            .scene
+            .borrow(unsafe { Python::assume_attached() })
+            .scene
+            .lock()
+            .unwrap() = Scene::new(width as u16, height as u16);
+        self.surface.configure(
+            &self.device,
+            &wgpu::SurfaceConfiguration {
+                usage: TextureUsages::RENDER_ATTACHMENT,
+                format: self
+                    .surface
+                    .get_capabilities(&self.adapter)
+                    .formats
+                    .first()
+                    .cloned()
+                    .unwrap_or(TextureFormat::Bgra8UnormSrgb),
+                width,
+                height,
+                present_mode: wgpu::PresentMode::Fifo,
+                alpha_mode: wgpu::CompositeAlphaMode::Auto,
+                view_formats: vec![],
+                desired_maximum_frame_latency: 2,
+            },
+        );
     }
 
-    pub fn new(scene: Py<PyScene>, window: Option<Py<PyWindowHandle>>) -> Self {
+    pub fn new(scene: Py<PyScene>, window_handle: Py<PyWindowHandle>) -> Self {
         let instance = Instance::new(&InstanceDescriptor {
             backends: Backends::all(),
             ..Default::default()
         });
 
-        let surface = if let Some(window_handle) = &window {
-            let window = window_handle
-                .borrow(unsafe { Python::assume_attached() })
-                .window
-                .clone();
-            Some(
-                instance
-                    .create_surface(window)
-                    .expect("Failed to create surface"),
-            )
-        } else {
-            None
-        };
+        let window = window_handle
+            .borrow(unsafe { Python::assume_attached() })
+            .window
+            .clone();
+        let window_size = window.inner_size();
+        let surface = instance
+            .create_surface(window)
+            .expect("Failed to create surface");
 
         let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
-            compatible_surface: surface.as_ref(),
+            compatible_surface: Some(&surface),
             ..Default::default()
         }))
         .expect("Failed to find an appropriate adapter");
@@ -81,36 +75,33 @@ impl PyRenderer {
             ..Default::default()
         }))
         .expect("Failed to create device");
-        let renderer = Arc::new(Mutex::new(
-            Renderer::new(&device, RendererOptions::default()).expect("Couldn't create renderer"),
-        ));
+        let renderer = Arc::new(Mutex::new(Renderer::new(
+            &device,
+            &RenderTargetConfig {
+                width: window_size.width,
+                height: window_size.height,
+                format: TextureFormat::Rgba8Unorm,
+            },
+        )));
 
-        if let Some(surface) = &surface {
-            let window = window.as_ref().unwrap();
-            let window_ref = window
-                .borrow(unsafe { Python::assume_attached() })
-                .window
-                .clone();
-            let size = window_ref.inner_size();
-            surface.configure(
-                &device,
-                &wgpu::SurfaceConfiguration {
-                    usage: TextureUsages::RENDER_ATTACHMENT,
-                    format: surface
-                        .get_capabilities(&adapter)
-                        .formats
-                        .first()
-                        .cloned()
-                        .unwrap_or(TextureFormat::Bgra8UnormSrgb),
-                    width: size.width,
-                    height: size.height,
-                    present_mode: wgpu::PresentMode::Fifo,
-                    alpha_mode: wgpu::CompositeAlphaMode::Auto,
-                    view_formats: vec![],
-                    desired_maximum_frame_latency: 2,
-                },
-            );
-        }
+        surface.configure(
+            &device,
+            &wgpu::SurfaceConfiguration {
+                usage: TextureUsages::RENDER_ATTACHMENT,
+                format: surface
+                    .get_capabilities(&adapter)
+                    .formats
+                    .first()
+                    .cloned()
+                    .unwrap_or(TextureFormat::Bgra8UnormSrgb),
+                width: window_size.width,
+                height: window_size.height,
+                present_mode: wgpu::PresentMode::Fifo,
+                alpha_mode: wgpu::CompositeAlphaMode::Auto,
+                view_formats: vec![],
+                desired_maximum_frame_latency: 2,
+            },
+        );
 
         PyRenderer {
             instance,
@@ -120,29 +111,22 @@ impl PyRenderer {
             surface,
             renderer,
             scene,
-            window,
+            window_handle,
         }
     }
 
     pub(crate) async fn render(&mut self, background_color: (f32, f32, f32, f32)) -> PyResult<()> {
-        let surface = self.surface.as_ref().expect("No surface available");
-        let window = match self.window.as_ref() {
-            Some(win) => win
-                .borrow(unsafe { Python::assume_attached() })
-                .window
-                .clone(),
-            None => {
-                return Err(PyValueError::new_err(
-                    "No window associated with this renderer",
-                ));
-            }
-        };
+        let window = &self
+            .window_handle
+            .borrow(unsafe { Python::assume_attached() })
+            .window;
         let (width, height) = {
             let size = window.inner_size();
             (size.width, size.height)
         };
 
-        let frame = surface
+        let frame = self
+            .surface
             .get_current_texture()
             .expect("Failed to get current frame");
         let frame_view = frame.texture.create_view(&TextureViewDescriptor::default());
@@ -166,40 +150,31 @@ impl PyRenderer {
         });
         let target_view = target_texture.create_view(&TextureViewDescriptor::default());
 
-        self.renderer
-            .lock()
-            .unwrap()
-            .render_to_texture(
-                &self.device,
-                &self.queue,
-                &self
-                    .scene
-                    .borrow(unsafe { Python::assume_attached() })
-                    .scene,
-                &target_view,
-                &vello::RenderParams {
-                    base_color: AlphaColor::new([
-                        background_color.0,
-                        background_color.1,
-                        background_color.2,
-                        background_color.3,
-                    ]),
-                    width,
-                    height,
-                    antialiasing_method: AaConfig::Msaa16,
-                },
-            )
-            .expect("failed to render to surface");
-
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor {
-                label: Some("Copy Texture to Buffer"),
+                ..Default::default()
             });
+
+        let scene = self.scene.borrow(unsafe { Python::assume_attached() });
+        let scene = scene.scene.lock().unwrap();
+
+        self.renderer
+            .lock()
+            .unwrap()
+            .render(
+                &scene,
+                &self.device,
+                &self.queue,
+                &mut encoder,
+                &RenderSize { width, height },
+                &target_view,
+            )
+            .expect("failed to render to surface");
 
         let blitter = TextureBlitter::new(
             &self.device,
-            surface.get_capabilities(&self.adapter).formats[0],
+            self.surface.get_capabilities(&self.adapter).formats[0],
         );
 
         blitter.copy(&self.device, &mut encoder, &target_view, &frame_view);

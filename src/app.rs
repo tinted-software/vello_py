@@ -48,6 +48,7 @@ pub enum PyWindowEvent {
 pub struct PyApp {
     title: String,
     transparent: bool,
+    show_decorations: bool,
     background_color: (f32, f32, f32, f32),
     app_fn: Py<PyAny>,
     scene: Py<PyScene>,
@@ -62,6 +63,7 @@ impl ApplicationHandler for PyApp {
                 .create_window(
                     Window::default_attributes()
                         .with_title(&self.title)
+                        .with_decorations(self.show_decorations)
                         .with_transparent(self.transparent),
                 )
                 .unwrap(),
@@ -80,7 +82,7 @@ impl ApplicationHandler for PyApp {
 
                 Py::new(
                     py,
-                    PyRenderer::new(self.scene.clone_ref(py), Some(py_window_handle)),
+                    PyRenderer::new(self.scene.clone_ref(py), py_window_handle),
                 )
             })
             .expect("Failed to create renderer"),
@@ -122,21 +124,23 @@ impl ApplicationHandler for PyApp {
     }
 }
 
-#[pyfunction(signature =(app_fn, title = "Vello App", transparent = false, background_color = (1.0, 1.0, 1.0, 1.0)))]
+#[pyfunction(signature =(app_fn, title = "Vello App", transparent = false, show_decorations = true, background_color = (1.0, 1.0, 1.0, 1.0)))]
 pub fn run_app(
     app_fn: Py<PyAny>,
     title: &str,
     transparent: bool,
+    show_decorations: bool,
     background_color: (f32, f32, f32, f32),
 ) {
     let handler = Box::leak(Box::new(PyApp {
         app_fn: app_fn,
-        scene: Py::new(unsafe { Python::assume_attached() }, PyScene::new())
+        scene: Py::new(unsafe { Python::assume_attached() }, PyScene::new(800, 600))
             .expect("Failed to create scene"),
         window: None,
         renderer: None,
         title: title.to_string(),
         transparent,
+        show_decorations,
         background_color,
     }));
 

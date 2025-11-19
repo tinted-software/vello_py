@@ -1,9 +1,11 @@
+use std::sync::{Arc, Mutex};
+
 use pyo3::{pyclass, pymethods};
-use vello::{
-    Scene,
-    kurbo::{Affine, BezPath, Circle, Rect, Stroke},
+use vello_common::{
+    kurbo::{Affine, BezPath, Circle, Rect, Shape, Stroke},
     peniko::{Color, Fill},
 };
+use vello_hybrid::Scene;
 
 enum ShapeInner {
     Path(BezPath),
@@ -54,53 +56,70 @@ impl PyShape {
 
 #[pyclass(name = "Scene")]
 pub struct PyScene {
-    pub scene: Scene,
+    pub scene: Arc<Mutex<Scene>>,
 }
 
 #[pymethods]
 impl PyScene {
     #[new]
-    pub fn new() -> Self {
+    pub fn new(width: u16, height: u16) -> Self {
         PyScene {
-            scene: Scene::new(),
+            scene: Arc::new(Mutex::new(Scene::new(width, height))),
         }
     }
 
     fn stroke(&mut self, stroke: f64, color: (f32, f32, f32, f32), shape: &PyShape) {
+        let mut scene = self.scene.lock().expect("Failed to lock scene");
         let stroke = Stroke::new(stroke);
         let color = Color::new([color.0, color.1, color.2, color.3]);
+        let affine = Affine::IDENTITY;
 
         match &shape.inner {
             ShapeInner::Path(path) => {
-                self.scene
-                    .stroke(&stroke, Affine::IDENTITY, color, None, path);
+                scene.set_transform(affine);
+                scene.set_paint(color);
+                scene.set_stroke(stroke);
+                scene.stroke_path(path);
             }
             ShapeInner::Rect(rect) => {
-                self.scene
-                    .stroke(&stroke, Affine::IDENTITY, color, None, rect);
+                scene.set_transform(affine);
+                scene.set_paint(color);
+                scene.set_stroke(stroke);
+                scene.stroke_rect(rect);
             }
             ShapeInner::Circle(circle) => {
-                self.scene
-                    .stroke(&stroke, Affine::IDENTITY, color, None, circle);
+                scene.set_transform(affine);
+                scene.set_paint(color);
+                scene.set_stroke(stroke);
+                scene.stroke_path(&circle.to_path(1e-9));
             }
         }
     }
 
     fn fill(&mut self, color: (f32, f32, f32, f32), shape: &PyShape) {
+        let mut scene = self.scene.lock().expect("Failed to lock scene");
+        let fill = Fill::NonZero;
         let color = Color::new([color.0, color.1, color.2, color.3]);
+        let affine = Affine::IDENTITY;
 
         match &shape.inner {
             ShapeInner::Path(path) => {
-                self.scene
-                    .fill(Fill::NonZero, Affine::IDENTITY, color, None, path);
+                scene.set_transform(affine);
+                scene.set_paint(color);
+                scene.set_fill_rule(fill);
+                scene.fill_path(path);
             }
             ShapeInner::Rect(rect) => {
-                self.scene
-                    .fill(Fill::NonZero, Affine::IDENTITY, color, None, rect);
+                scene.set_transform(affine);
+                scene.set_paint(color);
+                scene.set_fill_rule(fill);
+                scene.fill_rect(rect);
             }
             ShapeInner::Circle(circle) => {
-                self.scene
-                    .fill(Fill::NonZero, Affine::IDENTITY, color, None, circle);
+                scene.set_transform(affine);
+                scene.set_paint(color);
+                scene.set_fill_rule(fill);
+                scene.fill_path(&circle.to_path(1e-9));
             }
         }
     }

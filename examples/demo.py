@@ -39,4 +39,4 @@ def App():
 
 
 if __name__ == "__main__":
-    run_app(App)
+    run_app(App, show_decorations=False)
