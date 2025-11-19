@@ -1,3 +1,3 @@
 # vello-py
 
-An experimental python binding to Vello.
+Experimental python bindings for Vello.

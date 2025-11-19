@@ -1,17 +1,17 @@
 use pyo3::pymodule;
 
+pub mod app;
 pub mod render;
 pub mod scene;
-pub mod window;
 
 #[pymodule(name = "vello_py")]
-pub mod py_scene {
+pub mod vello {
     #[pymodule_export]
     use super::scene::{PyScene, PyShape};
 
     #[pymodule_export]
-    use super::window::run_winit;
+    use super::render::PyRenderer;
 
     #[pymodule_export]
-    use super::render::PyRenderer;
+    use super::app::{PyApp, PyMouseButton, PyMouseState, PyWindowEvent, PyWindowHandle, run_app};
 }

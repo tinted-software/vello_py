@@ -27,7 +27,7 @@ impl PyShape {
     }
 
     #[staticmethod]
-    pub fn bezpath(points: Vec<(f64, f64)>) -> Self {
+    pub fn path(points: Vec<(f64, f64)>) -> Self {
         let mut path = BezPath::new();
 
         for (i, (x, y)) in points.iter().enumerate() {
@@ -60,7 +60,7 @@ pub struct PyScene {
 #[pymethods]
 impl PyScene {
     #[new]
-    fn new() -> Self {
+    pub fn new() -> Self {
         PyScene {
             scene: Scene::new(),
         }
