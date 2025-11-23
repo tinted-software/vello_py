@@ -3,7 +3,7 @@ name = "vello_py"
 version = "0.1.0"
 description = "Python bindings for Vello"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = { file = "LICENSE.txt" }
 keywords = ["python", "rust", "pyo3", "vello"]
 classifiers = [

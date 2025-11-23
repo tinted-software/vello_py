@@ -10,7 +10,8 @@ crate-type = ["cdylib"]
 [dependencies]
 flume = "0.11.1"
 pollster = "0.4.0"
-pyo3 = { version = "0.27.1", features = ["extension-module", "experimental-async"] }
+# https://github.com/PyO3/pyo3/commit/a5a65384a8e859aa4db7912fba30ed06bb7d4c8f
+pyo3 = { git = "https://github.com/PyO3/pyo3", features = ["extension-module", "experimental-async"] }
 vello_common = { git = "https://github.com/linebender/vello" }
 vello_hybrid = { git = "https://github.com/linebender/vello" }
 wgpu = { version = "27.0.1", default-features = false, features = ["wgsl", "std"] }
